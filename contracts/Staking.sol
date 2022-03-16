@@ -57,7 +57,9 @@ contract Stake{
     function canStake(uint _amount, uint _timeLock) payable OnlyApeHolders public{
         require(_amount > 0, "increase the amount you are depositing please!");
         // payable(msg.sender).transfer(address(this), _amount);
-        
+        // 0x0ed64d01D0B4B655E410EF1441dD677B695639E7
+        stakeToken.transferFrom(msg.sender, address(this), _amount);
+
         balances += _amount;
         Owner storage own = brtOwners[Index];
         own.addr = msg.sender;
@@ -66,11 +68,11 @@ contract Stake{
         Index++;
     }
 
-    function withdrawStake(uint _index) OnlyApeHolders public view returns(uint _amount){
-
+    function withdrawStake(uint _index) OnlyApeHolders public returns(uint _amount){
         require(brtOwners[_index].timeLock == brtOwners[_index].timeLock * 30 days, "you will have to wait till staking period is over");
         _amount = brtOwners[_index].amount;
-        return logic(_amount, brtOwners[_index].timeLock);
+        _amount = logic(_amount, brtOwners[_index].timeLock);
+        require(stakeToken.transfer(msg.sender, _amount), "Transfer failed");
     }
 
 
