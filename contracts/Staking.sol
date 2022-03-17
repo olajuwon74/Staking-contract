@@ -42,11 +42,17 @@ contract Stake{
     mapping(address => Owner) public timeOfStaked;
 
 
-    function logic (uint _amount, uint _timeOfStake) private view returns(uint rate){
-        rate = (_amount * 10)/100;
+    function logic (uint _amount, uint _timeLock) private view returns(uint){
+        uint rate;
+        uint daysstaked;
+        uint daySec = 86400;
+        uint pCent = (33/100) * 1000;
+        rate = (_amount * pCent)/1000;
+        daysstaked = (block.timestamp - _timeLock) / daySec;
 
-         if( _timeOfStake > block.timestamp * 3 days){
-            return rate + _amount;
+         if( _timeLock > _timeLock * 3 days){
+            return (rate * daysstaked) + _amount;
+
         }
         else{
             return _amount;
@@ -54,25 +60,25 @@ contract Stake{
     }
 
 
-    function canStake(uint _amount, uint _timeLock) payable OnlyApeHolders public{
+    function canStake(uint _amount) payable OnlyApeHolders public{
         require(_amount > 0, "increase the amount you are depositing please!");
-        // payable(msg.sender).transfer(address(this), _amount);
-        // 0x0ed64d01D0B4B655E410EF1441dD677B695639E7
         stakeToken.transferFrom(msg.sender, address(this), _amount);
 
         balances += _amount;
         Owner storage own = brtOwners[Index];
         own.addr = msg.sender;
         own.amount = _amount;
-        own.timeLock = _timeLock;
+        own.timeLock = block.timestamp;
         Index++;
     }
 
-    function withdrawStake(uint _index) OnlyApeHolders public returns(uint _amount){
+    function withdrawStake(uint _index) OnlyApeHolders public returns(uint _amount, uint yield){
+        
         require(brtOwners[_index].timeLock == brtOwners[_index].timeLock * 30 days, "you will have to wait till staking period is over");
         _amount = brtOwners[_index].amount;
-        _amount = logic(_amount, brtOwners[_index].timeLock);
+        yield = logic(_amount, brtOwners[_index].timeLock);
         require(stakeToken.transfer(msg.sender, _amount), "Transfer failed");
+        return (_amount,yield);
     }
 
 
