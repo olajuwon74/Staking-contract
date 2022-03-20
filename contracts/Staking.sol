@@ -1,9 +1,9 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "brt.sol";
 
 
 
@@ -19,67 +19,77 @@ contract Stake{
     }
 
     address constant BoredapesNft = 0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D;
-    uint public balances;
+    uint public balance;
 
-    struct Owner{
+    struct Stake_Owners{
         address addr;
         uint amount;
-        uint timeLock;
+        uint timelock;
+        bool valid;
     }
 
+
+
+    uint Index;
+    uint profit_frame = 259200;
+
+    uint token_amount;
+    mapping(address => Stake_Owners) public brtOwners;
+
+
     modifier OnlyApeHolders{
-        require(IERC721(BoredapesNft).balanceOf(msg.sender) > 1, "You need to own a BoredApe");
+        require(IERC721(BoredapesNft).balanceOf(msg.sender) >= 1, "You need to own a BoredApe");
 
         _;
     }
     
 
-    uint public Index;
+    function stake(uint _amount)  payable OnlyApeHolders public {
+        Stake_Owners storage own = brtOwners[msg.sender];
+        require(balances[msg.sender] >= _amount, "you dont have sufficient amount to stake");
 
+        if(own.valid == true){
+            uint days_already_staked = block.timestamp - own.timelock;
+            uint token = own.amount;
+            balances[msg.sender] -= _amount;
 
-    mapping(uint => Owner) public brtOwners;
-    mapping(address => Owner) public balanceStaked;
-    mapping(address => Owner) public timeOfStaked;
-
-
-    function logic (uint _amount, uint _timeLock) private view returns(uint){
-        uint rate;
-        uint daysstaked;
-        uint daySec = 86400;
-        uint pCent = (33/100) * 1000;
-        rate = (_amount * pCent)/1000;
-        daysstaked = (block.timestamp - _timeLock) / daySec;
-
-         if( _timeLock > _timeLock * 3 days){
-            return (rate * daysstaked) + _amount;
-
+            if(days_already_staked >= 3 days){
+                uint yield = ((token * (days_already_staked /86400)) / 300);
+                uint total_yield = yield + _amount;
+                own._amount = total_yield;
+            }
+            else{
+                return (`you can't stake again, please wait till ${proof_frame - days_already_staked}`);
+            }
         }
+
         else{
-            return _amount;
+            own.addr = msg.sender;
+            own.amount = _amount;
+            own.timelock = block.timestamp;
+            own.valid = true;
+            Index++;  
         }
     }
 
+    function withdraw(uint _amount) public returns (uint total) {
+        Stake_Owners storage own = brtOwners[msg.sender];
+        require (msg.sender == own.addr, "you cant call this function");
+        require (own.valid == true, "you have no money in the stake");
+        uint days_already_staked = block.timestamp - own.timelock;
+        if (days_already_staked > 3 days){
+            uint token = own.amount;
+            uint yield = ((token * (days_already_staked /86400)) / 300);
+            own.amount += yield;
+        }
 
-    function canStake(uint _amount) payable OnlyApeHolders public{
-        require(_amount > 0, "increase the amount you are depositing please!");
-        stakeToken.transferFrom(msg.sender, address(this), _amount);
-
-        balances += _amount;
-        Owner storage own = brtOwners[Index];
-        own.addr = msg.sender;
-        own.amount = _amount;
-        own.timeLock = block.timestamp;
-        Index++;
+        else
+        require(own.amount >= _amount, "no funds");
+        own.amount -= amount;
+        balances[address(this)] -= _amount;
+        balances[msg.sender] += _amount;
+        own.time = block.timestamp;
+        own.amount == 0 ? own.valid = false:own.valid == true;  
     }
-
-    function withdrawStake(uint _index) OnlyApeHolders public returns(uint _amount, uint yield){
-        
-        require(brtOwners[_index].timeLock == brtOwners[_index].timeLock * 30 days, "you will have to wait till staking period is over");
-        _amount = brtOwners[_index].amount;
-        yield = logic(_amount, brtOwners[_index].timeLock);
-        require(stakeToken.transfer(msg.sender, _amount), "Transfer failed");
-        return (_amount,yield);
-    }
-
 
 }
