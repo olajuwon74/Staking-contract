@@ -1,95 +1,125 @@
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "brt.sol";
 
 
-
-contract Stake{
+contract Stake {
 
     string public gateTokenName;
     IERC20 public stakeToken;
 
-    constructor(
-        address _stakeTokenAddr
-    ) {
+    constructor(address _stakeTokenAddr) {
         stakeToken = IERC20(_stakeTokenAddr);
     }
 
     address constant BoredapesNft = 0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D;
-    uint public balance;
+    uint profit_frame = 259200;
 
-    struct Stake_Owners{
+    struct Owner{
         address addr;
         uint amount;
-        uint timelock;
+        uint timeLock;
         bool valid;
     }
 
-
-
-    uint Index;
-    uint profit_frame = 259200;
-
-    uint token_amount;
-    mapping(address => Stake_Owners) public brtOwners;
-
-
     modifier OnlyApeHolders{
         require(IERC721(BoredapesNft).balanceOf(msg.sender) >= 1, "You need to own a BoredApe");
-
         _;
     }
     
 
-    function stake(uint _amount)  payable OnlyApeHolders public {
-        Stake_Owners storage own = brtOwners[msg.sender];
-        require(balances[msg.sender] >= _amount, "you dont have sufficient amount to stake");
+    mapping(address => Owner) public brtStakers;
 
+
+    function logic (uint _amount, uint _timeLock, address stakerAddress) private view returns(uint){
+        _timeLock = brtStakers[stakerAddress].timeLock;
+        uint rate;
+        uint percent_per_sec = 39;
+        uint seconds_staked = block.timestamp - _timeLock;
+        rate = ((seconds_staked * percent_per_sec) * _amount)/10000000;
+        return rate;
+    }
+ 
+     function canStake(uint _amount) OnlyApeHolders public{
+         Owner storage own = brtStakers[msg.sender];
+         require(stakeToken.balanceOf(msg.sender) >= _amount, "you dont have sufficient amount to stake");
         if(own.valid == true){
-            uint days_already_staked = block.timestamp - own.timelock;
-            uint token = own.amount;
-            balances[msg.sender] -= _amount;
+            stakeToken.transferFrom(msg.sender, address(this), _amount);
+            uint days_already_staked;
+            uint latest_amount;
+            days_already_staked = block.timestamp - brtStakers[msg.sender].timeLock;
 
-            if(days_already_staked >= 3 days){
-                uint yield = ((token * (days_already_staked /86400)) / 300);
-                uint total_yield = yield + _amount;
-                own._amount = total_yield;
-            }
-            else{
-                return (`you can't stake again, please wait till ${proof_frame - days_already_staked}`);
-            }
+                if(days_already_staked >= brtStakers[msg.sender].timeLock + profit_frame){
+                latest_amount = stakeYield(msg.sender) + _amount;
+                own.amount = latest_amount;
+                    own.timeLock = block.timestamp;
+                }
+                else{
+                    latest_amount = _amount + brtStakers[msg.sender].amount;
+                    own.amount = latest_amount;
+                    own.timeLock = block.timestamp;
+                }
         }
-
-        else{
-            own.addr = msg.sender;
-            own.amount = _amount;
-            own.timelock = block.timestamp;
-            own.valid = true;
-            Index++;  
-        }
+         else {
+        stakeToken.transferFrom(msg.sender, address(this), _amount);
+        own.addr = msg.sender;
+        own.amount = _amount;
+        own.timeLock = block.timestamp;
+        own.valid = true;
+         }
     }
 
-    function withdraw(uint _amount) public returns (uint total) {
-        Stake_Owners storage own = brtOwners[msg.sender];
+
+     function stakeYield(address _addrs)public returns(uint){
+        uint myreturns;
+        uint amount;
+        uint timelock;
+        amount = brtStakers[msg.sender].amount;
+        timelock = brtStakers[msg.sender].timeLock;
+        myreturns = logic(amount, timelock, msg.sender); 
+        return myreturns;
+    }
+
+
+    function withdraw(uint _amount, address addr) public returns(uint){
+        Owner storage own = brtStakers[msg.sender];
+        uint vault;
+        uint days_already_staked = block.timestamp - brtStakers[msg.sender].timeLock;
         require (msg.sender == own.addr, "you cant call this function");
         require (own.valid == true, "you have no money in the stake");
-        uint days_already_staked = block.timestamp - own.timelock;
         if (days_already_staked > 3 days){
-            uint token = own.amount;
-            uint yield = ((token * (days_already_staked /86400)) / 300);
-            own.amount += yield;
-        }
+            vault = stakeYield(addr);
+            require(vault >= _amount, "reduce the amount you are trying to withdraw");
+            if (vault == _amount){
+                 stakeToken.transfer(msg.sender, _amount);
+                 own.amount = 0;
+                 own.timeLock = block.timestamp;
+            }
+            else {
+               stakeToken.transfer(msg.sender, _amount);
+               own.amount = vault - _amount;
+               own.timeLock = block.timestamp; 
+            }
 
-        else
-        require(own.amount >= _amount, "no funds");
-        own.amount -= amount;
-        balances[address(this)] -= _amount;
-        balances[msg.sender] += _amount;
-        own.time = block.timestamp;
-        own.amount == 0 ? own.valid = false:own.valid == true;  
-    }
+            }
+
+            else {
+               vault = brtStakers[msg.sender].amount;
+                if (vault == _amount){
+                 stakeToken.transfer(msg.sender, _amount);
+                 own.amount = 0;
+                 own.timeLock = block.timestamp;
+                }
+                else {
+                stakeToken.transfer(msg.sender, _amount);
+                own.amount = vault - _amount;
+                own.timeLock = block.timestamp; 
+                }
+
+            }
+        }
 
 }
