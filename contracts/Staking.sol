@@ -39,12 +39,13 @@ contract Stake {
         uint rate;
         uint percent_per_sec = 39;
         uint seconds_staked = block.timestamp - _timeLock;
-        rate = ((seconds_staked * percent_per_sec) * _amount)/10000000;
+        rate = ((seconds_staked * percent_per_sec) * _amount)/100000000;
         return rate;
     }
  
      function canStake(uint _amount) OnlyApeHolders public{
          Owner storage own = brtStakers[msg.sender];
+
          require(stakeToken.balanceOf(msg.sender) >= _amount, "you dont have sufficient amount to stake");
         if(own.valid == true){
             stakeToken.transferFrom(msg.sender, address(this), _amount);
@@ -52,7 +53,7 @@ contract Stake {
             uint latest_amount;
             days_already_staked = block.timestamp - brtStakers[msg.sender].timeLock;
 
-                if(days_already_staked >= brtStakers[msg.sender].timeLock + profit_frame){
+                if(days_already_staked > 3 days){
                 latest_amount = stakeYield(msg.sender) + _amount;
                 own.amount = latest_amount;
                     own.timeLock = block.timestamp;
