@@ -29,6 +29,9 @@ contract Stake {
         require(IERC721(BoredapesNft).balanceOf(msg.sender) >= 1, "You need to own a BoredApe");
         _;
     }
+
+
+    
     
 
     mapping(address => Owner) public brtStakers;
@@ -38,8 +41,7 @@ contract Stake {
         _timeLock = brtStakers[stakerAddress].timeLock;
         uint rate;
         uint percent_per_sec = 39;
-        uint seconds_staked = block.timestamp - _timeLock;
-        rate = ((seconds_staked * percent_per_sec) * _amount)/100000000;
+        rate = ((_timeLock * percent_per_sec) * _amount)/1000000000;
         return rate;
     }
  
